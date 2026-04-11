@@ -3,13 +3,18 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Studio ICO - Conversor Profissional</title>
+    <title>Studio Multi-Tools</title>
     <style>
         :root {
-            --primary: #6366f1;
-            --primary-hover: #4f46e5;
-            --danger: #ef4444;
             --bg: #0f172a;
+            /* Cores ICO */
+            --ico-primary: #6366f1;
+            --ico-primary-hover: #4f46e5;
+            /* Cores MP3 */
+            --mp3-primary: #10b981;
+            --mp3-primary-hover: #059669;
+            /* Cor Progresso */
+            --yellow-progress: #facc15;
         }
 
         body {
@@ -17,6 +22,7 @@
             background: linear-gradient(135deg, #0f172a 0%, #1e1b4b 100%);
             color: #f8fafc;
             display: flex;
+            flex-direction: column;
             align-items: center;
             justify-content: center;
             min-height: 100vh;
@@ -24,7 +30,33 @@
             overflow: hidden;
         }
 
-        /* Efeito de Vidro (Glassmorphism) */
+        /* Container das Abas */
+        .tabs-container {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+            background: rgba(255, 255, 255, 0.05);
+            padding: 8px;
+            border-radius: 16px;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(10px);
+        }
+
+        .tab-btn {
+            padding: 10px 20px;
+            border-radius: 10px;
+            border: none;
+            background: transparent;
+            color: #94a3b8;
+            cursor: pointer;
+            font-weight: 600;
+            transition: all 0.3s;
+        }
+
+        .tab-btn.active[data-target="ico"] { background: var(--ico-primary); color: white; }
+        .tab-btn.active[data-target="mp3"] { background: var(--mp3-primary); color: white; }
+
+        /* Estrutura dos Cards */
         .glass-card {
             background: rgba(255, 255, 255, 0.05);
             backdrop-filter: blur(12px);
@@ -36,12 +68,18 @@
             max-width: 450px;
             text-align: center;
             box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+            display: none; /* Escondido por padrão */
+            animation: fadeIn 0.5s ease-out;
         }
+
+        .glass-card.active { display: block; }
+
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
 
         h1 { font-size: 28px; margin-bottom: 8px; font-weight: 800; letter-spacing: -0.5px; }
         p { color: #94a3b8; margin-bottom: 30px; font-size: 14px; }
 
-        /* Área de Upload Customizada */
+        /* Área de Drop Comum */
         .drop-zone {
             border: 2px dashed rgba(255, 255, 255, 0.2);
             border-radius: 16px;
@@ -49,130 +87,146 @@
             transition: all 0.3s ease;
             cursor: pointer;
             margin-bottom: 20px;
-            position: relative;
+        }
+        #ico-content .drop-zone:hover, #ico-content .drop-zone.active { border-color: var(--ico-primary); background: rgba(99, 102, 241, 0.05); }
+        #mp3-content .drop-zone:hover, #mp3-content .drop-zone.active { border-color: var(--mp3-primary); background: rgba(16, 185, 129, 0.05); }
+
+        .btn-group { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+        button.action-btn {
+            padding: 14px; border-radius: 12px; border: none; font-size: 14px;
+            font-weight: 600; cursor: pointer; transition: all 0.2s;
+            display: flex; align-items: center; justify-content: center; gap: 8px;
         }
 
-        .drop-zone:hover, .drop-zone.active {
-            border-color: var(--primary);
-            background: rgba(99, 102, 241, 0.05);
-        }
+        .btn-convert-ico { background: var(--ico-primary); color: white; grid-column: span 2; margin-bottom: 10px; }
+        .btn-convert-mp3 { background: var(--mp3-primary); color: white; grid-column: span 2; margin-bottom: 10px; }
+        
+        button:disabled { background: #334155 ! stroke; color: #64748b; cursor: not-allowed; }
+        .btn-clear { background: rgba(255, 255, 255, 0.1); color: #f8fafc; grid-column: span 2; }
 
-        #fileInput { display: none; }
+        /* Barra de Progresso Unificada */
+        .progress-wrapper { margin-top: 25px; display: none; }
+        .progress-info { display: flex; justify-content: space-between; font-size: 12px; margin-bottom: 8px; color: var(--yellow-progress); }
+        .progress-bar-container { width: 100%; height: 8px; background: rgba(255, 255, 255, 0.1); border-radius: 20px; overflow: hidden; }
+        .progressBar { width: 0%; height: 100%; background: linear-gradient(90deg, #facc15, #fef08a); border-radius: 20px; transition: width 0.3s ease; box-shadow: 0 0 8px rgba(250, 204, 21, 0.4); }
 
-        .btn-group {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 12px;
-        }
-
-        button {
-            padding: 14px;
-            border-radius: 12px;
-            border: none;
-            font-size: 14px;
-            font-weight: 600;
-            cursor: pointer;
-            transition: all 0.2s;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            gap: 8px;
-        }
-
-        .btn-convert { background: var(--primary); color: white; grid-column: span 2; margin-bottom: 10px; }
-        .btn-convert:hover { background: var(--primary-hover); transform: translateY(-2px); }
-        .btn-convert:disabled { background: #334155; color: #64748b; cursor: not-allowed; transform: none; }
-
-        .btn-clear { background: rgba(255, 255, 255, 0.1); color: #f8fafc; }
-        .btn-clear:hover { background: rgba(255, 255, 255, 0.2); }
-
-        .status-badge {
-            font-size: 12px;
-            padding: 6px 12px;
-            border-radius: 20px;
-            background: rgba(34, 197, 94, 0.1);
-            color: #4ade80;
-            display: none;
-            margin-top: 15px;
-        }
-
-        /* Animação suave */
-        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
-        .glass-card { animation: fadeIn 0.6s ease-out; }
-
+        .status-msg { font-size: 12px; margin-top: 15px; color: #4ade80; display: none; }
+        .wait-message { margin-top: 12px; font-size: 11px; color: #94a3b8; font-style: italic; display: block; }
     </style>
 </head>
 <body>
 
-<div class="glass-card">
-    <h1>Studio ICO</h1>
-    <p>Converta imagens para ícones 256px de forma instantânea e privada para Windows.</p>
-
-    <div class="drop-zone" id="dropZone" onclick="document.getElementById('fileInput').click()">
-        <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color: var(--primary); margin-bottom: 10px;">
-            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
-            <polyline points="17 8 12 3 7 8"></polyline>
-            <line x1="12" y1="3" x2="12" y2="15"></line>
-        </svg>
-        <div id="dropText">Clique ou arraste as imagens aqui</div>
-        <input type="file" id="fileInput" accept="image/*" multiple>
-    </div>
-
-    <div class="btn-group">
-        <button id="btnConvert" class="btn-convert" disabled>
-            🚀 Converter Tudo
-        </button>
-        <button id="btnClear" class="btn-clear">
-            🗑️ Limpar
-        </button>
-    </div>
-
-    <div id="status" class="status-badge"></div>
+<div class="tabs-container">
+    <button class="tab-btn active" data-target="ico">Ícones (ICO)</button>
+    <button class="tab-btn" data-target="mp3">Áudio (MP3)</button>
 </div>
 
+<div id="ico-content" class="glass-card active">
+    <h1>Studio ICO</h1>
+    <p>Converta imagens para ícones 256px.</p>
+    <div class="drop-zone" id="dropZoneIco" onclick="document.getElementById('fileInputIco').click()">
+        <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="#6366f1" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M17 8l-5-5-5 5M12 3v12"/></svg>
+        <div id="dropTextIco">Clique ou arraste as imagens aqui</div>
+        <input type="file" id="fileInputIco" accept="image/*" multiple style="display:none">
+    </div>
+    <div class="btn-group">
+        <button id="btnConvertIco" class="action-btn btn-convert-ico" disabled>🚀 Converter Tudo</button>
+        <button id="btnClearIco" class="action-btn btn-clear">🗑️ Limpar Tudo</button>
+    </div>
+    <div class="progress-wrapper" id="progressWrapperIco">
+        <div class="progress-info"><span id="progressLabelIco">Processando...</span><span id="progressPercentIco">0%</span></div>
+        <div class="progress-bar-container"><div id="progressBarIco" class="progressBar"></div></div>
+    </div>
+    <div id="statusIco" class="status-msg"></div>
+</div>
+
+<div id="mp3-content" class="glass-card">
+    <h1>Studio MP3</h1>
+    <p>Converta áudio ou vídeo para MP3.</p>
+    <div class="drop-zone" id="dropZoneMp3" onclick="document.getElementById('fileInputMp3').click()">
+        <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="#10b981" stroke-width="2"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg>
+        <div id="dropTextMp3">Arraste seu arquivo aqui</div>
+        <input type="file" id="fileInputMp3" accept="audio/*,video/*,.ogg,.flac,.m4a,.wav" style="display:none">
+    </div>
+    <div class="btn-group">
+        <button id="btnConvertMp3" class="action-btn btn-convert-mp3" disabled>🚀 Iniciar Conversão</button>
+        <button id="btnClearMp3" class="action-btn btn-clear">🗑️ Limpar</button>
+    </div>
+    <div class="progress-wrapper" id="progressWrapperMp3">
+        <div class="progress-info"><span id="progressLabelMp3">Processando...</span><span id="progressPercentMp3">0%</span></div>
+        <div class="progress-bar-container"><div id="progressBarMp3" class="progressBar"></div></div>
+        <small class="wait-message">Aguarde, processamento local...</small>
+    </div>
+    <div id="statusMp3" class="status-msg"></div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/lamejs/1.2.1/lame.min.js"></script>
+
 <script>
-    const fileInput = document.getElementById('fileInput');
-    const btnConvert = document.getElementById('btnConvert');
-    const btnClear = document.getElementById('btnClear');
-    const status = document.getElementById('status');
-    const dropText = document.getElementById('dropText');
-    const dropZone = document.getElementById('dropZone');
+    // Lógica das Abas
+    const tabs = document.querySelectorAll('.tab-btn');
+    const contents = document.querySelectorAll('.glass-card');
+
+    tabs.forEach(tab => {
+        tab.addEventListener('click', () => {
+            tabs.forEach(t => t.classList.remove('active'));
+            contents.forEach(c => c.classList.remove('active'));
+            tab.classList.add('active');
+            document.getElementById(tab.dataset.target + '-content').classList.add('active');
+        });
+    });
+
+    // --- LÓGICA STUDIO ICO (Baseada no doctype1) ---
+    const fileInputIco = document.getElementById('fileInputIco');
+    const btnConvertIco = document.getElementById('btnConvertIco');
+    const btnClearIco = document.getElementById('btnClearIco');
+    const statusIco = document.getElementById('statusIco');
+    const progressBarIco = document.getElementById('progressBarIco');
+    const progressPercentIco = document.getElementById('progressPercentIco');
+    const progressWrapperIco = document.getElementById('progressWrapperIco');
+    const progressLabelIco = document.getElementById('progressLabelIco');
+    const dropTextIco = document.getElementById('dropTextIco');
     const SIZE = 256;
 
-    // Atualiza interface ao selecionar arquivos
-    fileInput.onchange = () => {
-        const count = fileInput.files.length;
+    fileInputIco.onchange = () => {
+        const count = fileInputIco.files.length;
         if (count > 0) {
-            btnConvert.disabled = false;
-            dropText.innerHTML = `<b>${count} arquivo(s)</b> prontos para conversão`;
-            status.style.display = "inline-block";
-            status.innerText = "Pronto para processar";
+            btnConvertIco.disabled = false;
+            dropTextIco.innerHTML = `<b>${count} arquivo(s)</b> selecionados`;
+            statusIco.style.display = "none";
+            progressWrapperIco.style.display = "none";
         }
     };
 
-    // Botão Limpar (Reseta tudo)
-    btnClear.onclick = () => {
-        fileInput.value = ""; // Limpa a seleção de arquivos
-        btnConvert.disabled = true;
-        dropText.innerHTML = "Clique ou arraste as imagens aqui";
-        status.style.display = "none";
+    btnClearIco.onclick = () => {
+        fileInputIco.value = "";
+        btnConvertIco.disabled = true;
+        dropTextIco.innerHTML = "Clique ou arraste as imagens aqui";
+        statusIco.style.display = "none";
+        progressWrapperIco.style.display = "none";
+        progressBarIco.style.width = "0%";
     };
 
-    // Processo de conversão
-    btnConvert.onclick = async () => {
-        const files = fileInput.files;
-        btnConvert.disabled = true;
-        
+    btnConvertIco.onclick = async () => {
+        const files = fileInputIco.files;
+        btnConvertIco.disabled = true;
+        progressWrapperIco.style.display = "block";
         for (let i = 0; i < files.length; i++) {
-            status.innerText = `Convertendo ${i + 1}/${files.length}...`;
-            await convertAndDownload(files[i]);
+            const percent = Math.floor((i / files.length) * 100);
+            progressBarIco.style.width = percent + "%";
+            progressPercentIco.innerText = percent + "%";
+            progressLabelIco.innerText = `Convertendo ${i + 1}/${files.length}...`;
+            await convertAndDownloadIco(files[i]);
         }
-        
-        status.innerText = "✨ Sucesso! Downloads concluídos.";
-        btnConvert.disabled = false;
+        progressBarIco.style.width = "100%";
+        progressPercentIco.innerText = "100%";
+        progressLabelIco.innerText = "Concluído!";
+        statusIco.innerText = "✨ Sucesso! Downloads concluídos.";
+        statusIco.style.display = "block";
+        btnConvertIco.disabled = false;
     };
 
-    function convertAndDownload(file) {
+    function convertAndDownloadIco(file) {
         return new Promise((resolve) => {
             const img = new Image();
             img.src = URL.createObjectURL(file);
@@ -180,16 +234,13 @@
                 const canvas = document.createElement('canvas');
                 canvas.width = SIZE; canvas.height = SIZE;
                 const ctx = canvas.getContext('2d');
-                ctx.clearRect(0, 0, SIZE, SIZE);
                 ctx.drawImage(img, 0, 0, SIZE, SIZE);
-
                 const imageData = ctx.getImageData(0, 0, SIZE, SIZE).data;
                 const icoBuffer = createIco(imageData, SIZE, SIZE);
                 const blob = new Blob([icoBuffer], {type: 'image/x-icon'});
                 const url = URL.createObjectURL(blob);
                 const a = document.createElement('a');
-                const originalName = file.name.split('.').slice(0, -1).join('.');
-                a.download = `${originalName}.ico`;
+                a.download = `${file.name.split('.')[0]}.ico`;
                 a.href = url;
                 a.click();
                 setTimeout(() => { URL.revokeObjectURL(url); resolve(); }, 150);
@@ -198,50 +249,116 @@
     }
 
     function createIco(rgbaData, width, height) {
-        const headerSize = 6, dirSize = 16, bmpHeaderSize = 40;
-        const pixelDataSize = width * height * 4;
+        const headerSize = 6, dirSize = 16, bmpHeaderSize = 40, pixelDataSize = width * height * 4;
         const buffer = new ArrayBuffer(headerSize + dirSize + bmpHeaderSize + pixelDataSize);
         const view = new DataView(buffer);
         view.setUint16(2, 1, true); view.setUint16(4, 1, true);
-        view.setUint8(6, width === 256 ? 0 : width); 
-        view.setUint8(7, height === 256 ? 0 : height);
-        view.setUint16(12, 32, true);
-        view.setUint32(14, bmpHeaderSize + pixelDataSize, true);
-        view.setUint32(18, headerSize + dirSize, true);
-        view.setUint32(22, 40, true);
-        view.setInt32(26, width, true); view.setInt32(30, height * 2, true);
+        view.setUint8(6, 0); view.setUint8(7, 0); view.setUint16(12, 32, true);
+        view.setUint32(14, bmpHeaderSize + pixelDataSize, true); view.setUint32(18, headerSize + dirSize, true);
+        view.setUint32(22, 40, true); view.setInt32(26, width, true); view.setInt32(30, height * 2, true);
         view.setUint16(34, 1, true); view.setUint16(36, 32, true);
         let offset = headerSize + dirSize + bmpHeaderSize;
         for (let y = height - 1; y >= 0; y--) {
             for (let x = 0; x < width; x++) {
                 const i = (y * width + x) * 4;
-                view.setUint8(offset++, rgbaData[i + 2]);
-                view.setUint8(offset++, rgbaData[i + 1]);
-                view.setUint8(offset++, rgbaData[i]);
-                view.setUint8(offset++, rgbaData[i + 3]);
+                view.setUint8(offset++, rgbaData[i + 2]); view.setUint8(offset++, rgbaData[i + 1]);
+                view.setUint8(offset++, rgbaData[i]); view.setUint8(offset++, rgbaData[i + 3]);
             }
         }
         return buffer;
     }
 
-    // Drag and Drop Effects
-    ['dragenter', 'dragover'].forEach(name => {
-        dropZone.addEventListener(name, e => {
-            e.preventDefault();
-            dropZone.classList.add('active');
-        });
-    });
-    ['dragleave', 'drop'].forEach(name => {
-        dropZone.addEventListener(name, e => {
-            e.preventDefault();
-            dropZone.classList.remove('active');
-        });
-    });
-    dropZone.addEventListener('drop', e => {
-        fileInput.files = e.dataTransfer.files;
-        fileInput.onchange();
-    });
-</script>
+    // --- LÓGICA STUDIO MP3 (Baseada no doctype2) ---
+    const fileInputMp3 = document.getElementById('fileInputMp3');
+    const btnConvertMp3 = document.getElementById('btnConvertMp3');
+    const btnClearMp3 = document.getElementById('btnClearMp3');
+    const statusMp3 = document.getElementById('statusMp3');
+    const progressBarMp3 = document.getElementById('progressBarMp3');
+    const progressPercentMp3 = document.getElementById('progressPercentMp3');
+    const progressWrapperMp3 = document.getElementById('progressWrapperMp3');
+    const progressLabelMp3 = document.getElementById('progressLabelMp3');
+    const dropTextMp3 = document.getElementById('dropTextMp3');
 
+    fileInputMp3.onchange = () => {
+        if(fileInputMp3.files.length > 0) {
+            btnConvertMp3.disabled = false;
+            dropTextMp3.innerHTML = `<b>Pronto:</b> ${fileInputMp3.files[0].name}`;
+            statusMp3.style.display = "none";
+            progressWrapperMp3.style.display = "none";
+        }
+    };
+
+    btnClearMp3.onclick = () => {
+        fileInputMp3.value = "";
+        btnConvertMp3.disabled = true;
+        dropTextMp3.innerText = "Arraste seu arquivo aqui";
+        statusMp3.style.display = "none";
+        progressWrapperMp3.style.display = "none";
+    };
+
+    btnConvertMp3.onclick = async () => {
+        const file = fileInputMp3.files[0];
+        if (!file) return;
+        btnConvertMp3.disabled = true;
+        progressWrapperMp3.style.display = "block";
+        statusMp3.style.display = "none";
+        const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        try {
+            progressLabelMp3.innerText = "Lendo arquivo...";
+            const arrayBuffer = await file.arrayBuffer();
+            const audioBuffer = await audioCtx.decodeAudioData(arrayBuffer);
+            progressLabelMp3.innerText = "Codificando...";
+            await encodeMP3(audioBuffer, file.name);
+            statusMp3.innerText = "✨ Sucesso!";
+            statusMp3.style.display = "block";
+            progressLabelMp3.innerText = "Finalizado!";
+        } catch (e) {
+            statusMp3.innerText = "❌ Erro no arquivo.";
+            statusMp3.style.display = "block";
+        }
+        btnConvertMp3.disabled = false;
+    };
+
+    function encodeMP3(audioBuffer, originalName) {
+        return new Promise((resolve) => {
+            const channels = audioBuffer.numberOfChannels;
+            const mp3encoder = new lamejs.Mp3Encoder(channels, audioBuffer.sampleRate, 128);
+            const mp3Data = [];
+            const samplesL = audioBuffer.getChannelData(0);
+            const samplesR = channels > 1 ? audioBuffer.getChannelData(1) : samplesL;
+            const bufferL = new Int16Array(samplesL.length);
+            const bufferR = new Int16Array(samplesR.length);
+            for (let i = 0; i < samplesL.length; i++) {
+                bufferL[i] = samplesL[i] < 0 ? samplesL[i] * 32768 : samplesL[i] * 32767;
+                bufferR[i] = samplesR[i] < 0 ? samplesR[i] * 32768 : samplesR[i] * 32767;
+            }
+            let i = 0;
+            const step = 1152;
+            function process() {
+                if (i < bufferL.length) {
+                    const chunkL = bufferL.subarray(i, i + step);
+                    const chunkR = bufferR.subarray(i, i + step);
+                    const mp3buf = mp3encoder.encodeBuffer(chunkL, chunkR);
+                    if (mp3buf.length > 0) mp3Data.push(mp3buf);
+                    i += step;
+                    const p = Math.floor((i/bufferL.length)*100);
+                    progressBarMp3.style.width = Math.min(p, 100) + "%";
+                    progressPercentMp3.innerText = Math.min(p, 100) + "%";
+                    setTimeout(process, 0);
+                } else {
+                    const end = mp3encoder.flush();
+                    if (end.length > 0) mp3Data.push(end);
+                    const blob = new Blob(mp3Data, { type: 'audio/mp3' });
+                    const a = document.createElement('a');
+                    a.href = URL.createObjectURL(blob);
+                    a.download = originalName.split('.')[0] + ".mp3";
+                    a.click();
+                    resolve();
+                }
+            }
+            process();
+        });
+    }
+</script>
 </body>
 </html>
