@@ -1,0 +1,386 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Studio ICO - Conversor de imagens</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      --bg1: #0f172a;
+      --bg2: #1e1b4b;
+      --card: rgba(255,255,255,.07);
+      --border: rgba(255,255,255,.14);
+      --primary: #6366f1;
+      --primary-hover: #4f46e5;
+      --text: #f8fafc;
+      --muted: #a5b4c7;
+      --success: #4ade80;
+      --error: #f87171;
+      --progress: #facc15;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      min-height: 100vh;
+      margin: 0;
+      padding: 24px;
+      display: grid;
+      place-items: center;
+      font-family: Inter, system-ui, -apple-system, "Segoe UI", sans-serif;
+      color: var(--text);
+      background: linear-gradient(135deg, var(--bg1), var(--bg2));
+    }
+
+    .card {
+      width: min(100%, 560px);
+      padding: clamp(24px, 5vw, 42px);
+      border: 1px solid var(--border);
+      border-radius: 24px;
+      background: var(--card);
+      box-shadow: 0 25px 70px rgba(0,0,0,.38);
+      backdrop-filter: blur(14px);
+    }
+
+    h1 { margin: 0 0 8px; font-size: clamp(26px, 5vw, 34px); }
+    .subtitle { margin: 0 0 26px; color: var(--muted); line-height: 1.55; }
+
+    .drop-zone {
+      display: grid;
+      place-items: center;
+      min-height: 190px;
+      padding: 28px;
+      border: 2px dashed rgba(255,255,255,.28);
+      border-radius: 18px;
+      text-align: center;
+      cursor: pointer;
+      transition: .2s ease;
+      outline: none;
+    }
+
+    .drop-zone:hover,
+    .drop-zone.dragover,
+    .drop-zone:focus-visible {
+      border-color: var(--primary);
+      background: rgba(99,102,241,.09);
+      transform: translateY(-1px);
+    }
+
+    .drop-zone svg { margin-bottom: 12px; }
+    .drop-zone strong { display: block; margin-bottom: 7px; }
+    .drop-zone small { color: var(--muted); }
+    input[type="file"] { display: none; }
+
+    .options {
+      margin: 18px 0;
+      padding: 14px 16px;
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      color: var(--muted);
+      font-size: 13px;
+      line-height: 1.5;
+    }
+
+    .buttons { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+    button {
+      min-height: 48px;
+      border: 0;
+      border-radius: 12px;
+      padding: 12px 16px;
+      font: inherit;
+      font-weight: 700;
+      cursor: pointer;
+      transition: .2s ease;
+    }
+    button:focus-visible { outline: 3px solid rgba(250,204,21,.55); outline-offset: 2px; }
+    .convert { color: white; background: var(--primary); }
+    .convert:hover:not(:disabled) { background: var(--primary-hover); }
+    .clear { color: var(--text); background: rgba(255,255,255,.12); }
+    .clear:hover:not(:disabled) { background: rgba(255,255,255,.18); }
+    button:disabled { opacity: .5; cursor: not-allowed; }
+
+    .progress-wrap { display: none; margin-top: 22px; }
+    .progress-info { display: flex; justify-content: space-between; gap: 12px; margin-bottom: 8px; color: var(--progress); font-size: 13px; }
+    progress { width: 100%; height: 10px; accent-color: var(--progress); }
+    .status { display: none; margin: 16px 0 0; font-size: 14px; line-height: 1.5; }
+    .status.success { display: block; color: var(--success); }
+    .status.error { display: block; color: var(--error); }
+
+    @media (max-width: 480px) {
+      body { padding: 14px; }
+      .buttons { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+  <main class="card">
+    <h1>Studio ICO</h1>
+    <p class="subtitle">Converta PNG, JPG, JPEG, WebP, GIF estático ou BMP em ícones compatíveis, com vários tamanhos no mesmo arquivo.</p>
+
+    <div id="dropZone" class="drop-zone" role="button" tabindex="0" aria-label="Selecionar imagens">
+      <div>
+        <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="#818cf8" stroke-width="1.8" aria-hidden="true">
+          <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+          <path d="m17 8-5-5-5 5M12 3v12"/>
+        </svg>
+        <strong id="dropTitle">Clique ou arraste as imagens aqui</strong>
+        <small id="dropText">Você pode selecionar vários arquivos</small>
+      </div>
+      <input id="fileInput" type="file" accept="image/png,image/jpeg,image/webp,image/gif,image/bmp" multiple>
+    </div>
+
+    <div class="options">
+      Cada ICO incluirá 16, 24, 32, 48, 64, 128 e 256 px. A proporção original será preservada e o espaço restante ficará transparente.
+    </div>
+
+    <div class="buttons">
+      <button id="convertBtn" class="convert" type="button" disabled>Converter para ICO</button>
+      <button id="clearBtn" class="clear" type="button">Limpar</button>
+    </div>
+
+    <div id="progressWrap" class="progress-wrap">
+      <div class="progress-info">
+        <span id="progressLabel">Preparando...</span>
+        <span id="progressPercent">0%</span>
+      </div>
+      <progress id="progress" max="100" value="0">0%</progress>
+    </div>
+
+    <p id="status" class="status" aria-live="polite"></p>
+  </main>
+
+  <script>
+    (() => {
+      'use strict';
+
+      const SIZES = [16, 24, 32, 48, 64, 128, 256];
+      const fileInput = document.getElementById('fileInput');
+      const dropZone = document.getElementById('dropZone');
+      const dropTitle = document.getElementById('dropTitle');
+      const dropText = document.getElementById('dropText');
+      const convertBtn = document.getElementById('convertBtn');
+      const clearBtn = document.getElementById('clearBtn');
+      const progressWrap = document.getElementById('progressWrap');
+      const progress = document.getElementById('progress');
+      const progressLabel = document.getElementById('progressLabel');
+      const progressPercent = document.getElementById('progressPercent');
+      const status = document.getElementById('status');
+      let selectedFiles = [];
+
+      const validTypes = new Set(['image/png', 'image/jpeg', 'image/webp', 'image/gif', 'image/bmp']);
+
+      function showStatus(message, type) {
+        status.textContent = message;
+        status.className = 'status ' + type;
+      }
+
+      function hideStatus() {
+        status.textContent = '';
+        status.className = 'status';
+      }
+
+      function updateProgress(value, label) {
+        const safeValue = Math.max(0, Math.min(100, Math.round(value)));
+        progress.value = safeValue;
+        progress.textContent = safeValue + '%';
+        progressPercent.textContent = safeValue + '%';
+        progressLabel.textContent = label;
+      }
+
+      function setFiles(files) {
+        const incoming = Array.from(files || []);
+        const valid = incoming.filter(file => validTypes.has(file.type) || /\.(png|jpe?g|webp|gif|bmp)$/i.test(file.name));
+        selectedFiles = valid;
+        hideStatus();
+        progressWrap.style.display = 'none';
+        updateProgress(0, 'Preparando...');
+
+        if (valid.length) {
+          dropTitle.textContent = valid.length === 1 ? valid[0].name : valid.length + ' imagens selecionadas';
+          dropText.textContent = 'Pronto para converter';
+          convertBtn.disabled = false;
+          if (valid.length !== incoming.length) {
+            showStatus('Alguns arquivos foram ignorados porque não são imagens compatíveis.', 'error');
+          }
+        } else {
+          resetSelection();
+          if (incoming.length) showStatus('Selecione arquivos PNG, JPG, JPEG, WebP, GIF estático ou BMP.', 'error');
+        }
+      }
+
+      function resetSelection() {
+        selectedFiles = [];
+        fileInput.value = '';
+        dropTitle.textContent = 'Clique ou arraste as imagens aqui';
+        dropText.textContent = 'Você pode selecionar vários arquivos';
+        convertBtn.disabled = true;
+        progressWrap.style.display = 'none';
+        updateProgress(0, 'Preparando...');
+      }
+
+      dropZone.addEventListener('click', () => fileInput.click());
+      dropZone.addEventListener('keydown', event => {
+        if (event.key === 'Enter' || event.key === ' ') {
+          event.preventDefault();
+          fileInput.click();
+        }
+      });
+      fileInput.addEventListener('change', () => setFiles(fileInput.files));
+
+      ['dragenter', 'dragover'].forEach(type => dropZone.addEventListener(type, event => {
+        event.preventDefault();
+        dropZone.classList.add('dragover');
+      }));
+      ['dragleave', 'drop'].forEach(type => dropZone.addEventListener(type, event => {
+        event.preventDefault();
+        dropZone.classList.remove('dragover');
+      }));
+      dropZone.addEventListener('drop', event => setFiles(event.dataTransfer.files));
+
+      clearBtn.addEventListener('click', () => {
+        resetSelection();
+        hideStatus();
+      });
+
+      function loadImage(file) {
+        return new Promise((resolve, reject) => {
+          const url = URL.createObjectURL(file);
+          const img = new Image();
+          img.onload = () => {
+            URL.revokeObjectURL(url);
+            resolve(img);
+          };
+          img.onerror = () => {
+            URL.revokeObjectURL(url);
+            reject(new Error('Não foi possível abrir ' + file.name));
+          };
+          img.src = url;
+        });
+      }
+
+      function canvasToPngBytes(canvas) {
+        return new Promise((resolve, reject) => {
+          canvas.toBlob(async blob => {
+            if (!blob) return reject(new Error('Falha ao gerar PNG interno.'));
+            resolve(new Uint8Array(await blob.arrayBuffer()));
+          }, 'image/png');
+        });
+      }
+
+      async function renderPng(img, size) {
+        const canvas = document.createElement('canvas');
+        canvas.width = size;
+        canvas.height = size;
+        const ctx = canvas.getContext('2d', { alpha: true });
+        ctx.clearRect(0, 0, size, size);
+        ctx.imageSmoothingEnabled = true;
+        ctx.imageSmoothingQuality = 'high';
+
+        const scale = Math.min(size / img.naturalWidth, size / img.naturalHeight);
+        const width = Math.max(1, Math.round(img.naturalWidth * scale));
+        const height = Math.max(1, Math.round(img.naturalHeight * scale));
+        const x = Math.floor((size - width) / 2);
+        const y = Math.floor((size - height) / 2);
+        ctx.drawImage(img, x, y, width, height);
+        return canvasToPngBytes(canvas);
+      }
+
+      function buildIco(images) {
+        const count = images.length;
+        const headerSize = 6;
+        const entrySize = 16;
+        const dataOffset = headerSize + count * entrySize;
+        const totalSize = dataOffset + images.reduce((sum, image) => sum + image.bytes.length, 0);
+        const buffer = new ArrayBuffer(totalSize);
+        const view = new DataView(buffer);
+        const output = new Uint8Array(buffer);
+
+        view.setUint16(0, 0, true);       // reservado
+        view.setUint16(2, 1, true);       // tipo 1 = ícone
+        view.setUint16(4, count, true);   // número de imagens
+
+        let offset = dataOffset;
+        images.forEach((image, index) => {
+          const entry = headerSize + index * entrySize;
+          view.setUint8(entry, image.size === 256 ? 0 : image.size);
+          view.setUint8(entry + 1, image.size === 256 ? 0 : image.size);
+          view.setUint8(entry + 2, 0);    // paleta: sem paleta
+          view.setUint8(entry + 3, 0);    // reservado
+          view.setUint16(entry + 4, 1, true);
+          view.setUint16(entry + 6, 32, true);
+          view.setUint32(entry + 8, image.bytes.length, true);
+          view.setUint32(entry + 12, offset, true);
+          output.set(image.bytes, offset);
+          offset += image.bytes.length;
+        });
+
+        return new Blob([buffer], { type: 'image/x-icon' });
+      }
+
+      function safeBaseName(name) {
+        const base = name.replace(/\.[^.]+$/, '').trim() || 'icone';
+        return base.replace(/[\\/:*?"<>|]+/g, '_');
+      }
+
+      function downloadBlob(blob, filename) {
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = filename;
+        document.body.appendChild(link);
+        link.click();
+        link.remove();
+        setTimeout(() => URL.revokeObjectURL(url), 1500);
+      }
+
+      async function convertFile(file) {
+        const img = await loadImage(file);
+        if (!img.naturalWidth || !img.naturalHeight) throw new Error('Imagem sem dimensões válidas: ' + file.name);
+        const images = [];
+        for (const size of SIZES) {
+          images.push({ size, bytes: await renderPng(img, size) });
+        }
+        return buildIco(images);
+      }
+
+      convertBtn.addEventListener('click', async () => {
+        if (!selectedFiles.length) return;
+
+        convertBtn.disabled = true;
+        clearBtn.disabled = true;
+        progressWrap.style.display = 'block';
+        hideStatus();
+        let completed = 0;
+        const failures = [];
+
+        for (let index = 0; index < selectedFiles.length; index++) {
+          const file = selectedFiles[index];
+          updateProgress((index / selectedFiles.length) * 100, 'Convertendo ' + (index + 1) + ' de ' + selectedFiles.length + '...');
+          try {
+            const ico = await convertFile(file);
+            downloadBlob(ico, safeBaseName(file.name) + '.ico');
+            completed++;
+            await new Promise(resolve => setTimeout(resolve, 250));
+          } catch (error) {
+            failures.push(file.name);
+            console.error(error);
+          }
+        }
+
+        updateProgress(100, 'Concluído');
+        convertBtn.disabled = false;
+        clearBtn.disabled = false;
+
+        if (!failures.length) {
+          showStatus(completed === 1 ? 'Conversão concluída. O arquivo ICO foi baixado.' : 'Conversões concluídas. Os arquivos ICO foram baixados.', 'success');
+        } else if (completed) {
+          showStatus(completed + ' arquivo(s) convertido(s). Falha em: ' + failures.join(', '), 'error');
+        } else {
+          showStatus('Não foi possível converter os arquivos selecionados.', 'error');
+        }
+      });
+    })();
+  </script>
+</body>
+</html>
