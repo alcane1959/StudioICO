@@ -178,6 +178,10 @@
           <label for="feather">Suavização <output id="featherOut">18</output></label>
           <input id="feather" type="range" min="0" max="100" value="18">
         </div>
+        <div class="field">
+          <label for="sharpness">Nitidez <output id="sharpOut">0</output></label>
+          <input id="sharpness" type="range" min="0" max="100" value="0">
+        </div>
         <label class="check-row"><input id="contiguous" type="checkbox" checked> Remover somente o fundo conectado às bordas</label>
       </div>
       <div style="margin-top:14px">Cada ICO incluirá 16, 24, 32, 48, 64, 128 e 256 px. A proporção original será preservada. Com a transparência desativada, o espaço restante recebe a cor escolhida.</div>
@@ -221,6 +225,7 @@
       const hexColor = document.getElementById('hexColor');
       const tolerance = document.getElementById('tolerance');
       const feather = document.getElementById('feather');
+      const sharpness = document.getElementById('sharpness');
       const contiguous = document.getElementById('contiguous');
       const pickColorBtn = document.getElementById('pickColorBtn');
       const previewBox = document.getElementById('previewBox');
@@ -262,6 +267,30 @@
         } else for(let i=0;i<d.length;i+=4)d[i+3]=alpha(i);
         context.putImageData(image,0,0);
       }
+      function applySharpen(sourceCanvas) {
+        const amount = Number(sharpness.value) / 100;
+        if (!amount) return;
+        const context = sourceCanvas.getContext('2d', { willReadFrequently:true });
+        const width = sourceCanvas.width, height = sourceCanvas.height;
+        if (width < 2 || height < 2) return;
+        const image = context.getImageData(0,0,width,height);
+        const source = image.data, horizontal = new Float32Array(source.length);
+        const radius = 1, windowSize = 3;
+        for (let y=0;y<height;y++) {
+          let red=0, green=0, blue=0;
+          for(let k=-radius;k<=radius;k++){const x=Math.max(0,Math.min(width-1,k)),i=(y*width+x)*4;red+=source[i];green+=source[i+1];blue+=source[i+2];}
+          for(let x=0;x<width;x++){const i=(y*width+x)*4;horizontal[i]=red/windowSize;horizontal[i+1]=green/windowSize;horizontal[i+2]=blue/windowSize;const removeX=Math.max(0,x-radius),addX=Math.min(width-1,x+radius+1),ri=(y*width+removeX)*4,ai=(y*width+addX)*4;red+=source[ai]-source[ri];green+=source[ai+1]-source[ri+1];blue+=source[ai+2]-source[ri+2];}
+        }
+        const blurred = new Float32Array(source.length);
+        for (let x=0;x<width;x++) {
+          let red=0, green=0, blue=0;
+          for(let k=-radius;k<=radius;k++){const y=Math.max(0,Math.min(height-1,k)),i=(y*width+x)*4;red+=horizontal[i];green+=horizontal[i+1];blue+=horizontal[i+2];}
+          for(let y=0;y<height;y++){const i=(y*width+x)*4;blurred[i]=red/windowSize;blurred[i+1]=green/windowSize;blurred[i+2]=blue/windowSize;const removeY=Math.max(0,y-radius),addY=Math.min(height-1,y+radius+1),ri=(removeY*width+x)*4,ai=(addY*width+x)*4;red+=horizontal[ai]-horizontal[ri];green+=horizontal[ai+1]-horizontal[ri+1];blue+=horizontal[ai+2]-horizontal[ri+2];}
+        }
+        const strength = amount * 2;
+        for(let i=0;i<source.length;i+=4){source[i]=Math.max(0,Math.min(255,Math.round(source[i]+(source[i]-blurred[i])*strength)));source[i+1]=Math.max(0,Math.min(255,Math.round(source[i+1]+(source[i+1]-blurred[i+1])*strength)));source[i+2]=Math.max(0,Math.min(255,Math.round(source[i+2]+(source[i+2]-blurred[i+2])*strength)));}
+        context.putImageData(image,0,0);
+      }
       function renderPreview() {
         if (!previewImage) { previewCanvas.width=previewCanvas.height=0; previewEmpty.hidden=false; return; }
         const max=360, scale=Math.min(1,max/previewImage.naturalWidth,max/previewImage.naturalHeight);
@@ -270,6 +299,7 @@
         previewCtx.clearRect(0,0,previewCanvas.width,previewCanvas.height);
         previewCtx.drawImage(previewImage,0,0,previewCanvas.width,previewCanvas.height);
         applyTransparency(previewCanvas);
+        applySharpen(previewCanvas);
         previewEmpty.hidden=true;
       }
       async function updatePreview() {
@@ -284,6 +314,7 @@
       hexColor.addEventListener('change',()=>{const rgb=hexToRgb(hexColor.value);if(rgb){syncColor(rgb);renderPreview();}});
       tolerance.addEventListener('input',()=>{document.getElementById('tolOut').value=tolerance.value;renderPreview();});
       feather.addEventListener('input',()=>{document.getElementById('featherOut').value=feather.value;renderPreview();});
+      sharpness.addEventListener('input',()=>{document.getElementById('sharpOut').value=sharpness.value;renderPreview();});
       contiguous.addEventListener('change',renderPreview);
       pickColorBtn.addEventListener('click',()=>{if(!previewImage)return; pickingColor=!pickingColor;previewBox.classList.toggle('picking',pickingColor);pickColorBtn.classList.toggle('active',pickingColor);});
       previewCanvas.addEventListener('click',event=>{if(!pickingColor||!previewImage)return;const rect=previewCanvas.getBoundingClientRect();const x=Math.max(0,Math.min(previewCanvas.width-1,Math.floor((event.clientX-rect.left)*previewCanvas.width/rect.width)));const y=Math.max(0,Math.min(previewCanvas.height-1,Math.floor((event.clientY-rect.top)*previewCanvas.height/rect.height)));previewCtx.clearRect(0,0,previewCanvas.width,previewCanvas.height);previewCtx.drawImage(previewImage,0,0,previewCanvas.width,previewCanvas.height);const pixel=previewCtx.getImageData(x,y,1,1).data;syncColor([pixel[0],pixel[1],pixel[2]]);stopPicking();renderPreview();});
@@ -399,7 +430,7 @@
         if(useTransparency.checked)ctx.clearRect(0,0,size,size);else{ctx.fillStyle=`rgb(${background[0]}, ${background[1]}, ${background[2]})`;ctx.fillRect(0,0,size,size);}
         ctx.imageSmoothingEnabled=true;ctx.imageSmoothingQuality='high';
         const scale=Math.min(size/source.width,size/source.height),width=Math.max(1,Math.round(source.width*scale)),height=Math.max(1,Math.round(source.height*scale)),x=Math.floor((size-width)/2),y=Math.floor((size-height)/2);
-        ctx.drawImage(source,x,y,width,height);return canvasToPngBytes(canvas);
+        ctx.drawImage(source,x,y,width,height);applySharpen(canvas);return canvasToPngBytes(canvas);
       }
 
       function buildIco(images) {
