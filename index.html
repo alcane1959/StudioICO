@@ -109,6 +109,18 @@
     .status.success { display: block; color: var(--success); }
     .status.error { display: block; color: var(--error); }
 
+
+    .transparency-toggle { display: flex; align-items: center; gap: 10px; color: var(--text); font-weight: 700; cursor: pointer; }
+    .transparency-toggle input, .check-row input { accent-color: var(--primary); }
+    .transparency-settings { display: none; margin-top: 14px; padding-top: 14px; border-top: 1px solid var(--border); }
+    .transparency-settings.visible { display: block; }
+    .field { margin-top: 12px; }
+    .field label { display: flex; justify-content: space-between; gap: 12px; color: var(--text); font-weight: 650; margin-bottom: 7px; }
+    .color-row { display: grid; grid-template-columns: 48px 1fr; gap: 8px; }
+    .color-row input { width: 100%; min-width: 0; height: 40px; border: 1px solid var(--border); border-radius: 10px; color: var(--text); background: rgba(255,255,255,.08); padding: 6px 9px; font: inherit; }
+    .color-row input[type="color"] { padding: 3px; cursor: pointer; }
+    .field input[type="range"] { width: 100%; accent-color: var(--primary); }
+    .check-row { display: flex; align-items: flex-start; gap: 9px; margin-top: 13px; color: var(--muted); cursor: pointer; }
     @media (max-width: 480px) {
       body { padding: 14px; }
       .buttons { grid-template-columns: 1fr; }
@@ -133,7 +145,23 @@
     </div>
 
     <div class="options">
-      Cada ICO incluirá 16, 24, 32, 48, 64, 128 e 256 px. A proporção original será preservada e o espaço restante ficará transparente.
+      <label class="transparency-toggle"><input id="useTransparency" type="checkbox"> Criar ICO com transparência</label>
+      <div id="transparencySettings" class="transparency-settings">
+        <div class="field">
+          <label>Cor a remover</label>
+          <div class="color-row"><input id="colorPicker" type="color" value="#ffffff"><input id="hexColor" value="#ffffff" maxlength="7" spellcheck="false" aria-label="Cor hexadecimal a remover"></div>
+        </div>
+        <div class="field">
+          <label for="tolerance">Tolerância <output id="tolOut">38</output></label>
+          <input id="tolerance" type="range" min="0" max="180" value="38">
+        </div>
+        <div class="field">
+          <label for="feather">Suavização <output id="featherOut">18</output></label>
+          <input id="feather" type="range" min="0" max="100" value="18">
+        </div>
+        <label class="check-row"><input id="contiguous" type="checkbox" checked> Remover somente o fundo conectado às bordas</label>
+      </div>
+      <div style="margin-top:14px">Cada ICO incluirá 16, 24, 32, 48, 64, 128 e 256 px. A proporção original será preservada. Com a transparência desativada, o espaço restante recebe a cor escolhida.</div>
     </div>
 
     <div class="buttons">
@@ -168,9 +196,62 @@
       const progressLabel = document.getElementById('progressLabel');
       const progressPercent = document.getElementById('progressPercent');
       const status = document.getElementById('status');
+      const useTransparency = document.getElementById('useTransparency');
+      const transparencySettings = document.getElementById('transparencySettings');
+      const colorPicker = document.getElementById('colorPicker');
+      const hexColor = document.getElementById('hexColor');
+      const tolerance = document.getElementById('tolerance');
+      const feather = document.getElementById('feather');
+      const contiguous = document.getElementById('contiguous');
       let selectedFiles = [];
 
       const validTypes = new Set(['image/png', 'image/jpeg', 'image/webp', 'image/gif', 'image/bmp']);
+
+      function hexToRgb(value) {
+        const hex = String(value || '').trim().replace('#', '');
+        if (!/^[0-9a-f]{6}$/i.test(hex)) return null;
+        return [parseInt(hex.slice(0, 2), 16), parseInt(hex.slice(2, 4), 16), parseInt(hex.slice(4, 6), 16)];
+      }
+      function syncColor(rgb) {
+        const value = '#' + rgb.map(v => Math.max(0, Math.min(255, v)).toString(16).padStart(2, '0')).join('');
+        colorPicker.value = value;
+        hexColor.value = value;
+      }
+      useTransparency.addEventListener('change', () => transparencySettings.classList.toggle('visible', useTransparency.checked));
+      colorPicker.addEventListener('input', () => { hexColor.value = colorPicker.value; });
+      hexColor.addEventListener('change', () => { const rgb = hexToRgb(hexColor.value); if (rgb) syncColor(rgb); });
+      tolerance.addEventListener('input', () => { document.getElementById('tolOut').value = tolerance.value; });
+      feather.addEventListener('input', () => { document.getElementById('featherOut').value = feather.value; });
+
+      function applyTransparency(sourceCanvas) {
+        if (!useTransparency.checked) return;
+        const target = hexToRgb(hexColor.value);
+        if (!target) throw new Error('Digite uma cor hexadecimal válida.');
+        const ctx = sourceCanvas.getContext('2d', { willReadFrequently: true });
+        const image = ctx.getImageData(0, 0, sourceCanvas.width, sourceCanvas.height);
+        const d = image.data, w = image.width, h = image.height;
+        const low = Number(tolerance.value), soft = Number(feather.value), high = low + soft;
+        const distance = i => Math.hypot(d[i] - target[0], d[i + 1] - target[1], d[i + 2] - target[2]);
+        const alpha = i => { const value = distance(i); if (value <= low) return 0; if (soft && value < high) return Math.round(255 * (value - low) / (high - low)); return 255; };
+        if (contiguous.checked) {
+          const seen = new Uint8Array(w * h), queue = new Int32Array(w * h), seeds = [];
+          for (let x = 0; x < w; x++) seeds.push(x, (h - 1) * w + x);
+          for (let y = 1; y < h - 1; y++) seeds.push(y * w, y * w + w - 1);
+          let head = 0, tail = 0;
+          for (const p of seeds) if (!seen[p] && distance(p * 4) <= high) { seen[p] = 1; queue[tail++] = p; }
+          while (head < tail) {
+            const p = queue[head++], x = p % w, y = Math.floor(p / w), i = p * 4;
+            d[i + 3] = alpha(i);
+            if (x && !seen[p - 1] && distance((p - 1) * 4) <= high) { seen[p - 1] = 1; queue[tail++] = p - 1; }
+            if (x < w - 1 && !seen[p + 1] && distance((p + 1) * 4) <= high) { seen[p + 1] = 1; queue[tail++] = p + 1; }
+            if (y && !seen[p - w] && distance((p - w) * 4) <= high) { seen[p - w] = 1; queue[tail++] = p - w; }
+            if (y < h - 1 && !seen[p + w] && distance((p + w) * 4) <= high) { seen[p + w] = 1; queue[tail++] = p + w; }
+          }
+        } else {
+          for (let i = 0; i < d.length; i += 4) d[i + 3] = alpha(i);
+        }
+        ctx.putImageData(image, 0, 0);
+      }
 
       function showStatus(message, type) {
         status.textContent = message;
@@ -271,20 +352,21 @@
       }
 
       async function renderPng(img, size) {
-        const canvas = document.createElement('canvas');
-        canvas.width = size;
-        canvas.height = size;
+        const source = document.createElement('canvas');
+        source.width = img.naturalWidth; source.height = img.naturalHeight;
+        source.getContext('2d', { alpha: true, willReadFrequently: true }).drawImage(img, 0, 0);
+        applyTransparency(source);
+        const canvas = document.createElement('canvas'); canvas.width = size; canvas.height = size;
         const ctx = canvas.getContext('2d', { alpha: true });
-        ctx.clearRect(0, 0, size, size);
-        ctx.imageSmoothingEnabled = true;
-        ctx.imageSmoothingQuality = 'high';
-
-        const scale = Math.min(size / img.naturalWidth, size / img.naturalHeight);
-        const width = Math.max(1, Math.round(img.naturalWidth * scale));
-        const height = Math.max(1, Math.round(img.naturalHeight * scale));
-        const x = Math.floor((size - width) / 2);
-        const y = Math.floor((size - height) / 2);
-        ctx.drawImage(img, x, y, width, height);
+        const background = hexToRgb(hexColor.value) || [255, 255, 255];
+        if (useTransparency.checked) ctx.clearRect(0, 0, size, size);
+        else { ctx.fillStyle = `rgb(${background[0]}, ${background[1]}, ${background[2]})`; ctx.fillRect(0, 0, size, size); }
+        ctx.imageSmoothingEnabled = true; ctx.imageSmoothingQuality = 'high';
+        const scale = Math.min(size / source.width, size / source.height);
+        const width = Math.max(1, Math.round(source.width * scale));
+        const height = Math.max(1, Math.round(source.height * scale));
+        const x = Math.floor((size - width) / 2), y = Math.floor((size - height) / 2);
+        ctx.drawImage(source, x, y, width, height);
         return canvasToPngBytes(canvas);
       }
 
@@ -322,7 +404,7 @@
 
       function safeBaseName(name) {
         const base = name.replace(/\.[^.]+$/, '').trim() || 'icone';
-        return base.replace(/[\\/:*?"<>|]+/g, '_');
+        return base.replace(/[\/:*?"<>|]+/g, '_');
       }
 
       function downloadBlob(blob, filename) {
